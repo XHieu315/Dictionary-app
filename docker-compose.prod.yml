@@ -1,0 +1,39 @@
+# File ĐÈ LÊN docker-compose.yml - dùng khi deploy/test image có sẵn.
+# Khác biệt duy nhất: web dùng "image:" (kéo từ registry) thay vì "build:" (tự build).
+#
+# Cách dùng - luôn phải kèm cả 2 file, file sau đè lên file trước:
+#   IMAGE_TAG=ghcr.io/user/dictionary-app:abc1234 \
+#     docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Vì sao tách file? Để dev ở máy vẫn "docker compose up --build" như cũ,
+# còn CI/CD thì chạy đúng image đã được test - không build lại lần nữa.
+
+services:
+  web:
+    # Ghi đè "build: ." của file gốc thành null => compose không build nữa
+    build: !reset null
+    image: ${IMAGE_TAG}
+    # Bỏ tên container cố định "dictionary-web". Tên cố định là DUY NHẤT trên toàn máy,
+    # nên stack smoke-test và stack đang deploy sẽ đụng nhau nếu cùng giữ tên đó.
+    # Bỏ đi thì compose tự đặt tên theo project: <project>-web-1.
+    container_name: !reset null
+
+  db:
+    container_name: !reset null
+
+    # Build image db từ db/Dockerfile (đã nhúng sẵn init.sql) thay vì
+    # dùng postgres:16-alpine + bind mount.
+    #
+    # Lý do: Jenkins chạy trong container nhưng điều khiển Docker của HOST
+    # (kiểu DooD). Khi compose mount "./db/init.sql", daemon tìm đường dẫn đó
+    # trên HOST - mà workspace của Jenkins (/var/jenkins_home/...) không tồn tại
+    # trên host. Docker mount thư mục rỗng -> Postgres bỏ qua init.sql ->
+    # lỗi 'relation "words" does not exist'.
+    #
+    # Nhúng vào image thì chạy đúng ở mọi môi trường.
+    build: ./db
+    image: !reset null
+
+    # Bỏ bind mount init.sql - đã nằm trong image rồi
+    volumes: !override
+      - pgdata:/var/lib/postgresql/data
