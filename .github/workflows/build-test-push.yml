@@ -66,6 +66,13 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      # Hạ chữ thường tên repository vì GHCR bắt buộc lowercase
+      - name: Chuẩn bị tên image chữ thường
+        id: meta
+        run: |
+          IMAGE_LOWER=$(echo "ghcr.io/${{ github.repository }}/web" | tr '[:upper:]' '[:lower:]')
+          echo "image_name=$IMAGE_LOWER" >> $GITHUB_OUTPUT
+
       # Bước 5: Build và push image đa kiến trúc
       # platforms tạo "manifest list": 1 tag chứa cả 2 bản.
       # Máy nào pull sẽ tự nhận đúng bản của máy đó.
@@ -76,5 +83,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:latest
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ steps.meta.outputs.image_name }}:latest
+            ${{ steps.meta.outputs.image_name }}:${{ github.sha }}
